@@ -1,0 +1,429 @@
+Problem Statement TitleDetection of Open Crust Mining Activity and 3D visualization
+
+
+
+Description Background
+
+
+
+Detection of open crust mining activity is an important task. With the development of space based remote sensing technology and availability of the open-source medium resolution data, it has become important to automatically delineate the open crust mining area through spatial contextual modelling technique. Estimation of mining depth, mining volume, 2D and 3D visualization of the mining area using the DEM is also necessary.
+
+Project: MINE-SIGMA (Detection of Open Crust Mining Activity & 3D Visualization)
+Objective: Automate the detection of illegal mining using AI (SAR + Optical fusion), visualize expansion in 4D on a web dashboard, and secure evidence on a blockchain.
+Core Innovation: "Early Fusion" of Sentinel-1 (Radar) and Sentinel-2 (Optical) data to eliminate blind spots caused by cloud cover.
+2. System Architecture
+Data Flow Pipeline
+Ingestion: Google Earth Engine (GEE) fetches and pre-processes Satellite Data.
+Processing: FastAPI backend orchestrates data retrieval and sends it to the AI Engine.
+Intelligence: PyTorch Fusion U-Net segments the image into "Mining" vs "Non-Mining" masks.
+Visualization: Next.js frontend renders the terrain in 3D using CesiumJS and overlays the mining mask.
+Security: A hash of the detection report is minted to an Ethereum-based blockchain.
+Technology Stack
+Layer
+Technology
+Specific Libraries/Tools
+Frontend
+Next.js 14+ (App Router)
+resium (Cesium wrapper), zustand, Tailwind CSS
+Backend
+FastAPI (Python 3.10+)
+uvicorn, pydantic, httpx
+AI/ML
+PyTorch
+segmentation-models-pytorch, numpy
+Geospatial
+Google Earth Engine
+earthengine-api, geemap, rasterio, geopandas
+Database
+PostgreSQL
+PostGIS extension, SQLAlchemy or SQLModel
+Blockchain
+Ethereum (Sepolia)
+Solidity, web3.py
+
+3. Data Sourcing Strategy (The "Secret Sauce")
+You will use a Multi-Modal Fusion approach. You are not just looking at pictures; you are looking at surface texture (Radar) and spectral signature (Optical).
+Source A: Sentinel-2 (Optical)
+Dataset: COPERNICUS/S2_SR
+Purpose: Vegetation indices (NDVI), visual confirmation.
+Bands Used: B4 (Red), B3 (Green), B2 (Blue), B8 (NIR).
+Source B: Sentinel-1 (SAR/Radar)
+Dataset: COPERNICUS/S1_GRD
+Purpose: Penetrates clouds, detects ground roughness (mining pits are rough).
+Bands Used: VV, VH.
+Fusion Method: Stack these bands into a single 6-channel tensor (R, G, B, NIR, VV, VH) before feeding into the AI.
+4. Directory Structure (Monorepo)
+mine-sigma/
+├── data_pipeline/              # Python scripts for GEE Data Eng
+│   ├── gee_auth.py             # Authentication handling
+│   ├── dataset_generator.py    # Fetches & fuses S1+S2 images
+│   └── export_chips.py         # Slices huge maps into 256x256 training chips
+│
+├── ai_engine/                  # PyTorch Model Logic
+│   ├── config.py               # Hyperparameters (Learning rate, etc)
+│   ├── dataset.py              # Custom PyTorch Dataset loader (.tif files)
+│   ├── model.py                # Fusion U-Net Architecture (Input=6 channels)
+│   ├── train.py                # Training loop script
+│   ├── inference.py            # Script to predict mask from new input
+│   └── weights/                # Stores trained .pth models
+│
+├── backend/                    # FastAPI Backend
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── endpoints/
+│   │   │   │   ├── detect.py   # Main endpoint: triggers AI analysis
+│   │   │   │   └── report.py   # PDF generation & Blockchain trigger
+│   │   ├── services/
+│   │   │   ├── gee_service.py  # Interface to GEE Python API
+│   │   │   └── chain_service.py# Web3.py logic for hashing
+│   │   ├── core/               # Database connections & Config
+│   │   └── main.py             # App entry point
+│   ├── Dockerfile
+│   └── requirements.txt
+│
+├── frontend/                   # Next.js Frontend
+│   ├── src/
+│   │   ├── app/                # App Router
+│   │   │   ├── dashboard/      # Main 4D Map View
+│   │   │   └── page.tsx        # Login / Home
+│   │   ├── components/
+│   │   │   ├── map/
+│   │   │   │   ├── CesiumMap.tsx # The 3D Globe component
+│   │   │   │   └── Timeline.tsx  # Slider for 4D view
+│   │   │   └── ui/             # Shared components
+│   │   └── lib/                # API fetchers & State management
+│   ├── public/                 # Cesium static assets (Workers)
+│   └── package.json
+
+5. Step-by-Step Implementation Guide
+Phase 1: Data Engineering & Setup
+GEE Setup: Sign up for Google Earth Engine. Create a Service Account in Google Cloud Console and download the JSON key.
+Environment: Set up a Python virtual environment.
+pip install earthengine-api geemap geopandas rasterio
+
+
+Training Data Generation:
+Identify known mining locations (e.g., Jharia, Jharkhand).
+Write dataset_generator.py to fetch S1 and S2 data for these locations.
+Fuse them and export 256x256 pixel "chips" (GeoTIFFs) to a local folder.
+Manually annotate masks using a tool like LabelStudio or QGIS (0=No Mine, 1=Mine).
+Phase 2: The AI Model (Fusion U-Net)
+Model Design: In ai_engine/model.py, define the U-Net.
+Crucial: Input channels = 6 (not the standard 3).
+import segmentation_models_pytorch as smp
+model = smp.Unet(
+    encoder_name="resnet34",
+    encoder_weights="imagenet",
+    in_channels=6,  # R, G, B, NIR, VV, VH
+    classes=1
+)
+
+
+Training: Run train.py on your generated chips. Optimize for Dice Loss (since mines are small areas compared to the background).
+Export: Save the best model as best_model.pth.
+Phase 3: Backend Development (FastAPI)
+API Setup: Initialize FastAPI.
+GEE Integration (gee_service.py):
+Write a function get_satellite_image(lat, lon, date) that returns the fused 6-channel NumPy array directly to memory (do not save to disk to save time).
+Inference Endpoint (detect.py):
+Accepts Lat/Lon/Date.
+Calls gee_service to get the image.
+Passes image to ai_engine to get the mask (0/1).
+Uses rasterio to convert the "1" pixels into GeoJSON Polygons.
+Returns the GeoJSON to the frontend.
+Phase 4: Frontend Visualization (Next.js + Cesium)
+Cesium Setup:
+Install resium and cesium.
+Configure next.config.js to copy Cesium's static assets (Workers, Textures) to the public folder (this is a common pitfall).
+Dashboard:
+Create a full-screen <Viewer> component.
+Add a "Time Slider" overlay.
+Interaction:
+When the user moves the slider to "Feb 2025", call the backend /detect API.
+Receive the GeoJSON polygon.
+Render it using <GeoJsonDataSource> with a red fill color (alpha 0.5) to show the mining expansion overlaying the real terrain.
+
+
+ML code ran in colab:
+# ==========================================
+# 1. INSTALL & IMPORTS
+# ==========================================
+import subprocess
+import sys
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+print("⏳ Checking libraries...")
+try:
+    import geemap
+except ImportError:
+    subprocess.run([sys.executable, "-m", "pip", "uninstall", "-y", "ee"], capture_output=True)
+    install("earthengine-api")
+    install("geemap")
+    install("fpdf")
+    install("rasterio")
+    install("plotly")
+    install("scipy")
+    install("scikit-image")
+    install("matplotlib")
+
+import plotly.graph_objects as go
+import rasterio
+import numpy as np
+from scipy.ndimage import zoom, median_filter, center_of_mass
+import ee
+import geemap
+import os
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from fpdf import FPDF
+import zipfile
+from datetime import datetime
+
+# ==========================================
+# 2. MOCK BACKEND & PARSER (Restored)
+# ==========================================
+def mock_ai_document_parser(file_path):
+    print(f"🤖 BACKEND: Receiving file '{file_path}'...")
+    print("🤖 AI MODEL: Parsing document parameters...")
+    # SIMULATED DATA
+    return {
+        "lat": 23.7957,
+        "lon": 86.4432,
+        "length_m": 2000, # Y-size
+        "width_m": 3000,  # X-size
+        "depth_m": 200,
+        "project_name": "Jharia_Final_Audit",
+        "lease_id": "JH-MIN-2023-99X"
+    }
+
+# ==========================================
+# 3. THE "PERFECT" 3D ENGINE
+# ==========================================
+def run_audit_engine(params):
+    project_name = params['project_name']
+    lat, lon = params['lat'], params['lon']
+    length_m, width_m = params['length_m'], params['width_m']
+
+    print(f"🚀 ENGINE: Starting analysis for {project_name}...")
+
+    # --- FILES ---
+    safe_name = project_name.replace(" ", "_")
+    base_dir = f"audit_output_{safe_name}"
+    os.makedirs(base_dir, exist_ok=True)
+    DEM_FILE = os.path.join(base_dir, "temp_DEM.tif")
+    SAT_FILE = os.path.join(base_dir, "temp_SAT.tif")
+    HTML_FILE = os.path.join(base_dir, f"{safe_name}_3D_Model.html")
+    PNG_FILE = os.path.join(base_dir, f"{safe_name}_2D_Map.png")
+    PDF_FILE = os.path.join(base_dir, f"{safe_name}_Official_Report.pdf")
+    ZIP_FILE = f"{safe_name}_Complete_Audit_Package.zip"
+
+    # --- INITIALIZE ---
+    try:
+        ee.Initialize()
+    except:
+        ee.Authenticate()
+        ee.Initialize()
+
+    # --- DOWNLOAD ---
+    buffer_size = max(length_m, width_m) * 3.0
+    roi = ee.Geometry.Point([lon, lat]).buffer(buffer_size).bounds()
+
+    if os.path.exists(DEM_FILE): os.remove(DEM_FILE)
+    geemap.ee_export_image(
+        ee.Image("USGS/SRTMGL1_003").clip(roi),
+        filename=DEM_FILE, scale=30, region=roi, crs='EPSG:3857', file_per_band=False
+    )
+
+    if os.path.exists(SAT_FILE): os.remove(SAT_FILE)
+    s2 = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+          .filterBounds(roi).sort('CLOUDY_PIXEL_PERCENTAGE')
+          .first().select(['B4', 'B8'])) 
+    geemap.ee_export_image(
+        s2.clip(roi), filename=SAT_FILE, scale=30, region=roi, crs='EPSG:3857', file_per_band=False
+    )
+
+    # --- PROCESSING ---
+    with rasterio.open(SAT_FILE) as src:
+        red = src.read(1).astype(float)
+        nir = src.read(2).astype(float)
+        ndvi = (nir - red) / (nir + red + 1e-5)
+        mine_mask = np.zeros_like(ndvi)
+        mine_mask[ndvi < 0.2] = 1
+        mine_mask = median_filter(mine_mask, size=5)
+
+    with rasterio.open(DEM_FILE) as src:
+        elevation = src.read(1)
+        elevation = np.where(elevation < -100, np.min(elevation[elevation > -100]), elevation)
+        res_x = src.transform[0]
+        res_y = -src.transform[4]
+
+    # --- DOWNSAMPLE ---
+    DOWNSAMPLE = 0.5
+    z = zoom(elevation, DOWNSAMPLE, order=1)
+    mine_m = zoom(mine_mask, DOWNSAMPLE, order=0)
+    
+    min_r, min_c = min(z.shape[0], mine_m.shape[0]), min(z.shape[1], mine_m.shape[1])
+    z = z[:min_r, :min_c]
+    mine_m = mine_m[:min_r, :min_c]
+
+    # --- COORDINATE ALIGNMENT ---
+    eff_res_x = res_x / DOWNSAMPLE
+    eff_res_y = res_y / DOWNSAMPLE
+    
+    px_width = int(width_m / eff_res_x)   # X-axis size
+    px_length = int(length_m / eff_res_y) # Y-axis size
+
+    # Center on Mine
+    if np.sum(mine_m) > 0:
+        cy, cx = center_of_mass(mine_m)
+        cy, cx = int(cy), int(cx)
+    else:
+        rows, cols = z.shape
+        cy, cx = rows//2, cols//2
+
+    # Define Bounds
+    r_start = cy - (px_length // 2)
+    r_end   = cy + (px_length // 2)
+    c_start = cx - (px_width // 2)
+    c_end   = cx + (px_width // 2)
+
+    # Clamp
+    rows, cols = z.shape
+    r_start, r_end = max(0, r_start), min(rows, r_end)
+    c_start, c_end = max(0, c_start), min(cols, c_end)
+
+    # Create Legal Mask
+    legal_m = np.zeros_like(z)
+    legal_m[r_start:r_end, c_start:c_end] = 1
+
+    # --- COLOR LOGIC (Using the specificTint/Black/Red logic) ---
+    plot_values = np.zeros_like(z)
+    z_norm = (z - np.min(z)) / (np.max(z) - np.min(z) + 1e-5)
+
+    # Base: Plains (Green)
+    plot_values = z_norm * 0.8 
+
+    # Debug: Tint Legal Area (1.2)
+    plot_values[legal_m == 1] = 1.2 
+
+    # Mine Logic
+    # If Mine + Inside Box -> Black (2.0)
+    plot_values[(mine_m == 1) & (legal_m == 1)] = 2.0
+    # If Mine + Outside Box -> Red (3.0)
+    plot_values[(mine_m == 1) & (legal_m == 0)] = 3.0
+
+    # --- STATS ---
+    pixel_area_ha = (eff_res_x * eff_res_y) / 10000.0
+    legal_px = np.sum((mine_m == 1) & (legal_m == 1))
+    illegal_px = np.sum((mine_m == 1) & (legal_m == 0))
+    stats = {
+        "legal_ha": legal_px * pixel_area_ha,
+        "illegal_ha": illegal_px * pixel_area_ha,
+        "total_ha": (legal_px + illegal_px) * pixel_area_ha,
+        "compliance_score": (legal_px / (legal_px + illegal_px) * 100) if (legal_px + illegal_px) > 0 else 100
+    }
+    print(f"📊 STATS: Illegal Encroachment: {stats['illegal_ha']:.2f} Ha")
+
+    # --- 3D RENDER (With Corrected Colorscale) ---
+    custom_colorscale = [
+        [0.0, 'rgb(34, 139, 34)'], [0.3, 'rgb(139, 69, 19)'], [0.35, 'rgb(139, 69, 19)'], 
+        [0.3501, 'rgb(100, 120, 100)'], [0.5, 'rgb(100, 120, 100)'], # Blue Tint
+        [0.5001, 'rgb(10, 10, 20)'], [0.8, 'rgb(10, 10, 20)'], # Black
+        [0.8001, 'rgb(255, 0, 0)'], [1.0, 'rgb(255, 0, 0)'] # Red
+    ]
+
+    fig = go.Figure(data=[go.Surface(
+        z=z, surfacecolor=plot_values, cmin=0, cmax=3,
+        colorscale=custom_colorscale, showscale=False,
+        lighting=dict(ambient=0.5, roughness=0.9, diffuse=0.8)
+    )])
+
+    # Green Box
+    z_top = np.max(z) + 50
+    x_b = [c_start, c_end, c_end, c_start, c_start]
+    y_b = [r_start, r_start, r_end, r_end, r_start]
+    fig.add_trace(go.Scatter3d(x=x_b, y=y_b, z=[z_top]*5, mode='lines', line=dict(color='#00FF00', width=6), name="Authorized Limit"))
+
+    fig.update_layout(
+        title=f"Audit: {project_name}",
+        scene=dict(aspectmode='manual', aspectratio=dict(x=1, y=1, z=0.5),
+        xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(title="Elevation")),
+        template="plotly_dark"
+    )
+    fig.write_html(HTML_FILE)
+
+    # --- 2D PNG ---
+    mpl_colors = np.array([
+        [34/255, 139/255, 34/255, 1],  # Terrain
+        [100/255, 120/255, 100/255, 1], # Tint
+        [10/255, 10/255, 20/255, 1],   # Black
+        [255/255, 0, 0, 1]             # Red
+    ])
+    mpl_cmap = ListedColormap(mpl_colors)
+    
+    # Map to 0,1,2,3 indices for 2D map
+    mpl_data = np.zeros_like(plot_values, dtype=int)
+    mpl_data[plot_values <= 0.8] = 0
+    mpl_data[plot_values == 1.2] = 1
+    mpl_data[plot_values == 2.0] = 2
+    mpl_data[plot_values == 3.0] = 3
+
+    plt.figure(figsize=(10, 10))
+    plt.imshow(mpl_data, cmap=mpl_cmap)
+    plt.plot([c_start, c_end, c_end, c_start, c_start], [r_start, r_start, r_end, r_end, r_start], 'lime', linewidth=3)
+    plt.axis('off')
+    plt.savefig(PNG_FILE, bbox_inches='tight', dpi=150)
+    plt.close()
+
+    return stats, HTML_FILE, PNG_FILE, PDF_FILE, ZIP_FILE, base_dir
+
+# ==========================================
+# 4. REPORT GENERATOR
+# ==========================================
+def generate_pdf_report(params, stats, png_path, pdf_path):
+    print("📄 REPORT: Compiling PDF...")
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 16)
+    pdf.cell(0, 10, 'Satellite Mining Compliance Report', 0, 1, 'C')
+    pdf.set_font('Arial', '', 12)
+    pdf.cell(0, 10, f"Project: {params['project_name']}", 0, 1)
+    pdf.cell(0, 10, f"Authorized Dimensions: {params['length_m']}m x {params['width_m']}m", 0, 1)
+    pdf.ln(5)
+    
+    # Stats
+    pdf.set_fill_color(200, 255, 200)
+    pdf.cell(100, 10, f"Authorized Mining: {stats['legal_ha']:.2f} Ha", 1, 1, 'L', True)
+    pdf.set_fill_color(255, 200, 200)
+    pdf.cell(100, 10, f"Illegal Encroachment: {stats['illegal_ha']:.2f} Ha", 1, 1, 'L', True)
+    pdf.ln(5)
+    
+    # Image
+    pdf.cell(0, 10, "Visual Evidence:", 0, 1)
+    pdf.image(png_path, x=10, w=180)
+    pdf.output(pdf_path)
+
+# ==========================================
+# 5. EXECUTION WRAPPER
+# ==========================================
+def handle_upload(file_path):
+    print("\n🌐 SERVER: Processing Request...")
+    params = mock_ai_document_parser(file_path)
+    stats, html, png, pdf, zip_name, base = run_audit_engine(params)
+    generate_pdf_report(params, stats, png, pdf)
+    
+    with zipfile.ZipFile(zip_name, 'w') as z:
+        for f in [html, png, pdf]: z.write(f, os.path.basename(f))
+    
+    return zip_name
+
+# RUN
+pkg = handle_upload("Lease_Doc.pdf")
+try:
+    from google.colab import files
+    files.download(pkg)
+    print(f"⬇️ Downloading {pkg}...")
+except:
+    print(f"✅ Package saved: {pkg}")

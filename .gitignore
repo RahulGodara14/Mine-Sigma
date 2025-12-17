@@ -1,0 +1,67 @@
+# ---- Secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# DB files
+*.db
+*.sqlite
+*.sqlite3
+
+# Local keys
+serviceAccountKey.json
+*.pem
+*.key
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+dist/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js env
+frontend/.env.local
+frontend/.env.*.local
+
+# ---- Expo / React Native ----
+.expo/
+.expo-shared/
+web-build/
+*.jks
+*.keystore
+
+# ---- Hardhat ----
+Mine-Guard/blockchain/cache/
+Mine-Guard/blockchain/artifacts/
+Mine-Guard/blockchain/typechain-types/
+
+# ---- OS / Editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
