@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: mineguard-db
+    environment:
+      POSTGRES_USER: mineguard
+      POSTGRES_PASSWORD: mineguard_password
+      POSTGRES_DB: mineguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mineguard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ganache:
+    image: trufflesuite/ganache:latest
+    container_name: mineguard-ganache
+    ports:
+      - "8545:8545"
+    command: --host 0.0.0.0 --mnemonic "test test test test test test test test test test test junk"
+    environment:
+      GANACHE_ACCOUNTS: 10
+      GANACHE_INITIAL_BALANCE: 100
+
+volumes:
+  postgres_data:
