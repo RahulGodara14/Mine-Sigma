@@ -16,12 +16,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy backend requirements and install dependencies
-COPY backend/requirements.txt requirements.txt
+# Copy requirements from either root or backend/ context
+COPY requirements.txt* backend/requirements.txt* ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend application files into container
-COPY backend/ .
+# Copy source files
+COPY backend/ ./
+COPY . ./
 
 EXPOSE 8000
 
