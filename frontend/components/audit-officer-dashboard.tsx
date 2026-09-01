@@ -217,7 +217,7 @@ export function AuditOfficerDashboard() {
           {/* Map View */}
           {activeTab === "map" && (
             <iframe
-              src="http://localhost:3000/map"
+              src="/map"
               className="w-full h-full border-0"
               title="Cesium Map View"
             />

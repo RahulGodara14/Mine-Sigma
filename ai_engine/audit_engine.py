@@ -13,30 +13,57 @@ from matplotlib.colors import ListedColormap
 
 def initialize_gee():
     try:
-        # 1. Locate Key File
-        # Go up from 'ai_engine' -> 'backend' -> 'serviceAccountKey.json'
-        key_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend/serviceAccountKey.json"))
+        # 1. Check environment variable first
+        gee_json = os.getenv("GEE_SERVICE_ACCOUNT_JSON") or os.getenv("SERVICE_ACCOUNT_KEY")
+        if gee_json:
+            import json
+            key_data = json.loads(gee_json)
+            project_id = key_data.get("project_id", "mining-solver")
+            # Write to a temporary file if needed by ee
+            key_path = "/tmp/gee_service_key.json"
+            with open(key_path, "w") as f:
+                json.dump(key_data, f)
+            credentials = ee.ServiceAccountCredentials(
+                key_data.get("client_email"),
+                key_file=key_path
+            )
+            ee.Initialize(credentials, project=project_id)
+            print(f"✅ GEE: Authenticated via environment variable as {project_id}")
+            return
+
+        # 2. Check known filesystem paths
+        candidates = [
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend/serviceAccountKey.json")),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "../serviceAccountKey.json")),
+            "/app/backend/serviceAccountKey.json",
+            "/app/serviceAccountKey.json",
+            "serviceAccountKey.json"
+        ]
         
-        if os.path.exists(key_path):
-            # 2. Read Project ID from the JSON file
+        key_path = None
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                key_path = candidate
+                break
+
+        if key_path:
             import json
             with open(key_path) as f:
                 key_data = json.load(f)
-                project_id = key_data.get("project_id") # e.g., "mining-solver"
+                project_id = key_data.get("project_id", "mining-solver")
             
-            # 3. Authenticate using that specific Project ID
             credentials = ee.ServiceAccountCredentials(
                 key_data.get("client_email"), 
                 key_file=key_path
             )
             ee.Initialize(credentials, project=project_id)
-            print(f"✅ GEE: Authenticated as {project_id}")
+            print(f"✅ GEE: Authenticated via key file as {project_id}")
         else:
-            # Fallback
-            ee.Authenticate()
-            ee.Initialize()
+            print("⚠️ GEE: No serviceAccountKey found, skipping GEE initialization")
+            raise RuntimeError("Google Earth Engine credentials not configured.")
     except Exception as e:
         print(f"❌ GEE Auth Error: {e}")
+        raise
 
 def run_audit_pipeline(params, output_base_path="public"):
     # Unpack Parameters
