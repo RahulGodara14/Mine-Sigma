@@ -29,6 +29,8 @@ interface DemQuantSummary {
   averageMeanDepthMeters: number
 }
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api"
+
 export function AuditOfficerDashboard() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [showResults, setShowResults] = useState(false)
@@ -53,7 +55,7 @@ export function AuditOfficerDashboard() {
   useEffect(() => {
     const fetchLatestAnalysis = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:8000/api/analysis/latest")
+        const response = await fetch(`${API_BASE}/analysis/latest`)
         const data = await response.json()
         if (data.status === "success") {
           setAnalysisResult(data)
@@ -85,7 +87,7 @@ export function AuditOfficerDashboard() {
   const fetchTimelineDates = async (lat: number, lon: number) => {
     try {
       setTimelineLoading(true)
-      const response = await fetch(`http://127.0.0.1:8000/api/timeseries/${lat}/${lon}`)
+      const response = await fetch(`${API_BASE}/timeseries/${lat}/${lon}`)
       const data = await response.json()
       if (data.dates && data.dates.length > 0) {
         setTimelineData(data.dates)
@@ -104,7 +106,7 @@ export function AuditOfficerDashboard() {
   const fetchTimelineImage = async (lat: number, lon: number, date: string) => {
     try {
       setTimelineLoading(true)
-      const response = await fetch(`http://127.0.0.1:8000/api/satellite-image/${lat}/${lon}/${date}`)
+      const response = await fetch(`${API_BASE}/satellite-image/${lat}/${lon}/${date}`)
       const data = await response.json()
       if (data.status === "success" && data.image_url) {
         setTimelineImageUrl(data.image_url)
