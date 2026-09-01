@@ -2,7 +2,6 @@
 .gitignore
 frontend
 Mine-Guard
-ai_engine
 **/node_modules
 **/.next
 **/__pycache__

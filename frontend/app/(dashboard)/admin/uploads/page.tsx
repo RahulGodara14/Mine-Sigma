@@ -10,6 +10,7 @@ export default function UploadPage() {
   const [status, setStatus] = useState("idle"); // idle, processing, success, error
   const [dragActive, setDragActive] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -18,6 +19,7 @@ export default function UploadPage() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
       setStatus("idle");
+      setErrorMessage(null);
     }
   };
 
@@ -40,6 +42,7 @@ export default function UploadPage() {
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       setFile(e.dataTransfer.files[0]);
       setStatus("idle");
+      setErrorMessage(null);
     }
   };
 
@@ -50,6 +53,7 @@ export default function UploadPage() {
     setUploading(true);
     setStatus("processing");
     setProgress(0);
+    setErrorMessage(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -62,7 +66,16 @@ export default function UploadPage() {
       });
 
       if (!response.ok) {
-        throw new Error("Upload failed");
+        let msg = "Upload failed";
+        try {
+          const errData = await response.json();
+          msg = errData.detail || errData.message || msg;
+        } catch {
+          const errText = await response.text();
+          if (errText) msg = errText;
+        }
+        setErrorMessage(msg);
+        throw new Error(msg);
       }
 
       setProgress(100);
@@ -245,7 +258,7 @@ export default function UploadPage() {
               
               {status === 'error' && (
                 <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-300 text-sm">
-                  ❌ Upload failed. Please check your backend connection and try again.
+                  {errorMessage ? `❌ ${errorMessage}` : "❌ Upload failed. Please check your backend connection and try again."}
                 </div>
               )}
             </div>

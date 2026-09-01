@@ -2,7 +2,8 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    PYTHONPATH="/app:/app/backend:/ai_engine:/"
 
 WORKDIR /app
 
@@ -16,13 +17,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements from either root or backend/ context
+# Copy requirements and install dependencies
 COPY requirements.txt* backend/requirements.txt* ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source files (works for both root context and backend context)
-COPY backend/ ./
-COPY . ./
+# Copy source code and ai_engine
+COPY ai_engine/ /app/ai_engine/
+COPY ai_engine/ /ai_engine/
+COPY backend/ /app/
+COPY backend/ /app/backend/
 
 EXPOSE 8000
 
