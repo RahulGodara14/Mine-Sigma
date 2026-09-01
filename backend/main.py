@@ -14,7 +14,7 @@ from app.main import create_app
 # Create the FastAPI application
 app = create_app()
 
-# 1. CORS (Allow Frontend)
+# 1. CORS (Allow Frontend & Cloud Deployments)
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -26,10 +26,16 @@ origins = [
     "http://10.150.57.227:19006",
 ]
 
+cors_env = os.getenv("CORS_ORIGINS", "")
+if cors_env:
+    for o in cors_env.split(","):
+        if o.strip():
+            origins.append(o.strip())
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\.53\.9\.227|10\.150\.57\.227)(:\d+)?$",
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|10\..*|.*\.vercel\.app|.*\.onrender\.com|.*\.railway\.app)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

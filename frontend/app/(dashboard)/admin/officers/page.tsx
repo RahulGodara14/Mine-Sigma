@@ -18,7 +18,7 @@ interface User {
     name: string
     email: string
     phone: string
-    role: "Officer"
+    role: "Admin" | "Officer"
     status: "Active" | "Inactive"
     location: string
     joinedDate: string
@@ -51,7 +51,7 @@ export default function UserManagementPage() {
         name: "",
         email: "",
         phone: "",
-        role: "Officer" as "Officer",
+        role: "Officer" as "Admin" | "Officer",
         status: "Active" as "Active" | "Inactive",
         location: "",
         password: "",
