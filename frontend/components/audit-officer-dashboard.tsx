@@ -68,21 +68,37 @@ export function AuditOfficerDashboard() {
     fetchLatestAnalysis()
   }, [])
 
-  // Fetch timeline dates when analysis result is available (only once)
+  // Helper to extract coordinates safely (defaulting to Jharia mine)
+  const getCoordinates = (): [number, number] => {
+    if (analysisResult?.location) {
+      try {
+        const parts = analysisResult.location.split(",").map((v: string) => parseFloat(v.trim()))
+        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+          return [parts[0], parts[1]]
+        }
+      } catch {}
+    }
+    return [23.7483, 86.4172]
+  }
+
+  // Fetch timeline dates when 4D tab is active or analysisResult is loaded
   useEffect(() => {
-    if (analysisResult?.location && timelineData.length === 0) {
-      const [lat, lon] = analysisResult.location.split(",").map((v: string) => parseFloat(v.trim()))
+    if (timelineData.length === 0) {
+      const [lat, lon] = getCoordinates()
       fetchTimelineDates(lat, lon)
     }
-  }, [analysisResult?.location])
+  }, [analysisResult?.location, activeTab])
 
-  // Fetch timeline image when date is selected (only when selectedDateIndex changes)
+  // Fetch timeline image when date is selected or activeTab switches to 4d
   useEffect(() => {
-    if (timelineData.length > 0 && analysisResult?.location && activeTab === "4d") {
-      const [lat, lon] = analysisResult.location.split(",").map((v: string) => parseFloat(v.trim()))
-      fetchTimelineImage(lat, lon, timelineData[selectedDateIndex])
+    if (timelineData.length > 0 && activeTab === "4d") {
+      const [lat, lon] = getCoordinates()
+      const dateToFetch = timelineData[selectedDateIndex] || timelineData[0]
+      if (dateToFetch) {
+        fetchTimelineImage(lat, lon, dateToFetch)
+      }
     }
-  }, [selectedDateIndex, activeTab])
+  }, [selectedDateIndex, activeTab, timelineData.length])
 
   const fetchTimelineDates = async (lat: number, lon: number) => {
     try {
