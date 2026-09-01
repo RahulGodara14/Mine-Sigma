@@ -2,8 +2,7 @@ services:
   - type: web
     name: mine-sigma-backend
     env: docker
-    dockerfilePath: backend/Dockerfile
-    dockerContext: backend
+    dockerfilePath: Dockerfile
     plan: free
     healthCheckPath: /
     autoDeploy: true
